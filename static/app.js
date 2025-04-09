@@ -463,8 +463,96 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Run workflow
     function runWorkflow() {
-        // This would be implemented to execute the workflow
-        // For now, just show an alert
-        alert('Workflow execution would start here. This would involve sending the workflow data to a backend server that would execute each agent in sequence.');
+        // Get all nodes and connections
+        const nodes = [];
+        const connections = [];
+        
+        // Collect all nodes
+        document.querySelectorAll('.node').forEach(node => {
+            const nodeId = node.id;
+            const nodeType = node.classList[1];
+            const nodeContent = node.querySelector('.node-content').textContent;
+            
+            nodes.push({
+                id: nodeId,
+                type: nodeType,
+                content: nodeContent
+            });
+        });
+        
+        // Collect all connections
+        jsPlumbInstance.getAllConnections().forEach(conn => {
+            connections.push({
+                source: conn.source.id,
+                target: conn.target.id
+            });
+        });
+        
+        // Create workflow data
+        const workflowData = {
+            nodes: nodes,
+            connections: connections
+        };
+        
+        // Show loading message
+        const outputContent = document.getElementById('output-content');
+        outputContent.innerHTML = '<p>Running workflow...</p>';
+        
+        // Send workflow data to backend
+        fetch('/run-workflow', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(workflowData)
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error('Network response was not ok');
+            }
+            return response.json();
+        })
+        .then(data => {
+            // Display the output
+            displayOutput(data);
+        })
+        .catch(error => {
+            console.error('Error running workflow:', error);
+            outputContent.innerHTML = `<p>Error running workflow: ${error.message}</p>`;
+        });
+    }
+    
+    // Function to display output from the workflow
+    function displayOutput(data) {
+        const outputContent = document.getElementById('output-content');
+        
+        // Clear previous output
+        outputContent.innerHTML = '';
+        
+        // Check if there's an error
+        if (data.error) {
+            outputContent.innerHTML = `<p>Error: ${data.error}</p>`;
+            return;
+        }
+        
+        // Display the output based on its type
+        if (data.type === 'text') {
+            outputContent.innerHTML = `<p>${data.content}</p>`;
+        } else if (data.type === 'image') {
+            outputContent.innerHTML = `
+                <p>Generated Image:</p>
+                <img src="${data.content}" alt="Generated image">
+            `;
+        } else if (data.type === 'video') {
+            outputContent.innerHTML = `
+                <p>Generated Video:</p>
+                <video controls>
+                    <source src="${data.content}" type="video/mp4">
+                    Your browser does not support the video tag.
+                </video>
+            `;
+        } else {
+            outputContent.innerHTML = `<p>Unknown output type: ${data.type}</p>`;
+        }
     }
 }); 
