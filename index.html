@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Agent Workflow Builder</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jsPlumb/2.15.6/js/jsplumb.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <h2>Agent Blocks</h2>
+            <div class="agent-blocks">
+                <div class="agent-block" draggable="true" data-type="midjourney">Midjourney Agent</div>
+                <div class="agent-block" draggable="true" data-type="gpt">GPT Agent</div>
+                <div class="agent-block" draggable="true" data-type="custom">Custom Agent</div>
+            </div>
+            <div class="workflow-actions">
+                <button id="save-workflow">Save Workflow</button>
+                <button id="load-workflow">Load Workflow</button>
+                <button id="run-workflow">Run Workflow</button>
+            </div>
+        </div>
+        <div class="main-content">
+            <div class="toolbar">
+                <button id="add-connection">Add Connection</button>
+                <button id="delete-selected">Delete Selected</button>
+                <button id="clear-canvas">Clear Canvas</button>
+            </div>
+            <div id="canvas" class="canvas"></div>
+        </div>
+        <div class="properties-panel">
+            <h2>Properties</h2>
+            <div id="properties-content">
+                <p>Select an agent to view its properties</p>
+            </div>
+        </div>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html> 
