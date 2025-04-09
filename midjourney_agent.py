@@ -2,9 +2,11 @@ import os
 import requests
 import time
 from dotenv import load_dotenv
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
+from flask_cors import CORS
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder='static')
+CORS(app)  # Enable CORS for all routes
 
 class MidjourneyAgent:
     def __init__(self):
@@ -112,6 +114,11 @@ class MidjourneyAgent:
 
 agent = MidjourneyAgent()
 
+@app.route('/')
+def index():
+    """Serve the main application page"""
+    return send_from_directory('static', 'index.html')
+
 @app.route('/generate', methods=['POST'])
 def generate_image():
     data = request.get_json()
@@ -134,6 +141,74 @@ def generate_image():
             return jsonify({'error': 'Failed to generate image'}), 500
     else:
         return jsonify({'error': 'Failed to create image generation task'}), 500
+
+@app.route('/run-workflow', methods=['POST'])
+def run_workflow():
+    """
+    Execute a workflow defined by nodes and connections.
+    
+    The workflow data should contain:
+    - nodes: List of nodes with id, type, and content
+    - connections: List of connections with source and target node ids
+    
+    Returns:
+        JSON response with the workflow execution result
+    """
+    data = request.get_json()
+    
+    if not data or 'nodes' not in data or 'connections' not in data:
+        return jsonify({'error': 'Invalid workflow data'}), 400
+    
+    nodes = data['nodes']
+    connections = data['connections']
+    
+    # Find the starting node (node with no incoming connections)
+    start_nodes = []
+    for node in nodes:
+        is_start = True
+        for conn in connections:
+            if conn['target'] == node['id']:
+                is_start = False
+                break
+        if is_start:
+            start_nodes.append(node)
+    
+    if not start_nodes:
+        return jsonify({'error': 'No starting node found in the workflow'}), 400
+    
+    # For now, we'll just execute the first starting node
+    # In a more complex implementation, you would execute the entire workflow
+    start_node = start_nodes[0]
+    
+    # Execute the node based on its type
+    if start_node['type'] == 'midjourney':
+        # Generate image using Midjourney
+        result = agent.generate_image(start_node['content'])
+        if result and result.get('code') == 200:
+            task_id = result['data']['task_id']
+            
+            final_result = agent.wait_for_task_completion(task_id)
+            if final_result:
+                return jsonify({
+                    'type': 'image',
+                    'content': final_result['data']['output']['image_url']
+                })
+            else:
+                return jsonify({'error': 'Failed to generate image'}), 500
+        else:
+            return jsonify({'error': 'Failed to create image generation task'}), 500
+    elif start_node['type'] == 'gpt':
+        # For now, just return a mock response for GPT
+        return jsonify({
+            'type': 'text',
+            'content': f"GPT response to: {start_node['content']}"
+        })
+    else:
+        # For custom or unknown agent types
+        return jsonify({
+            'type': 'text',
+            'content': f"Custom agent response to: {start_node['content']}"
+        })
 
 if __name__ == '__main__':
     app.run(debug=True) 

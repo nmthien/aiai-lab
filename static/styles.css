@@ -82,6 +82,63 @@ body {
     overflow: hidden;
 }
 
+.content-area {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+}
+
+.canvas {
+    flex: 1;
+    position: relative;
+    overflow: auto;
+    background-color: #ecf0f1;
+    background-image: 
+        linear-gradient(rgba(200, 200, 200, 0.2) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(200, 200, 200, 0.2) 1px, transparent 1px);
+    background-size: 20px 20px;
+}
+
+.output-panel {
+    width: 300px;
+    background-color: #2c3e50;
+    color: white;
+    padding: 20px;
+    overflow-y: auto;
+    border-left: 1px solid #34495e;
+}
+
+.output-panel h2 {
+    margin-bottom: 20px;
+    font-size: 1.5rem;
+    border-bottom: 1px solid #34495e;
+    padding-bottom: 10px;
+}
+
+#output-content {
+    min-height: 200px;
+}
+
+#output-content img {
+    max-width: 100%;
+    border-radius: 5px;
+    margin-top: 10px;
+}
+
+#output-content video {
+    max-width: 100%;
+    border-radius: 5px;
+    margin-top: 10px;
+}
+
+#output-content pre {
+    background-color: #34495e;
+    padding: 10px;
+    border-radius: 5px;
+    overflow-x: auto;
+    margin-top: 10px;
+}
+
 .toolbar {
     padding: 10px;
     background-color: #34495e;
@@ -101,17 +158,6 @@ body {
 
 .toolbar button:hover {
     background-color: #2980b9;
-}
-
-.canvas {
-    flex: 1;
-    position: relative;
-    overflow: auto;
-    background-color: #ecf0f1;
-    background-image: 
-        linear-gradient(rgba(200, 200, 200, 0.2) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(200, 200, 200, 0.2) 1px, transparent 1px);
-    background-size: 20px 20px;
 }
 
 .properties-panel {

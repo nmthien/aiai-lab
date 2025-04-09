@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Multi-Agent Workflow Builder</title>
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="static/styles.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jsPlumb/2.15.6/js/jsplumb.min.js"></script>
 </head>
 <body>
@@ -28,7 +28,15 @@
                 <button id="delete-selected">Delete Selected</button>
                 <button id="clear-canvas">Clear Canvas</button>
             </div>
-            <div id="canvas" class="canvas"></div>
+            <div class="content-area">
+                <div id="canvas" class="canvas"></div>
+                <div class="output-panel">
+                    <h2>Output</h2>
+                    <div id="output-content">
+                        <p>Workflow output will appear here</p>
+                    </div>
+                </div>
+            </div>
         </div>
         <div class="properties-panel">
             <h2>Properties</h2>
@@ -37,6 +45,6 @@
             </div>
         </div>
     </div>
-    <script src="app.js"></script>
+    <script src="static/app.js"></script>
 </body>
 </html> 
