@@ -2,13 +2,15 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatMessages = document.getElementById('chat-messages');
     const userInput = document.getElementById('user-input');
     const sendButton = document.getElementById('send-button');
-    const agentSelect = document.getElementById('agent-select');
+    const agentList = document.getElementById('agent-list');
+    const currentAgentTitle = document.getElementById('current-agent');
     
-    // Fetch agents from backend and populate dropdown
+    // Store chat histories for each agent
+    const chatHistories = new Map();
+    let currentAgent = null;
+    
+    // Fetch agents from backend and populate sidebar
     fetchAgents();
-    
-    // Add welcome message
-    addMessage({ text: 'Hello! I am your AI assistant. How can I help you today?', is_image: false }, false);
     
     // Handle send button click
     sendButton.addEventListener('click', sendMessage);
@@ -28,21 +30,17 @@ document.addEventListener('DOMContentLoaded', () => {
             if (response.ok) {
                 const data = await response.json();
                 if (data.status === 'success') {
-                    // Clear existing options
-                    agentSelect.innerHTML = '';
+                    // Clear existing agents
+                    agentList.innerHTML = '';
                     
-                    // Add default option
-                    const defaultOption = document.createElement('option');
-                    defaultOption.value = '';
-                    defaultOption.textContent = 'Select an Agent';
-                    agentSelect.appendChild(defaultOption);
-                    
-                    // Add agents from database
+                    // Add agents to sidebar
                     data.data.forEach(agent => {
-                        const option = document.createElement('option');
-                        option.value = agent.username;
-                        option.textContent = agent.name || agent.username;
-                        agentSelect.appendChild(option);
+                        const agentItem = document.createElement('div');
+                        agentItem.className = 'agent-item';
+                        agentItem.dataset.username = agent.username;
+                        agentItem.textContent = agent.name || agent.username;
+                        agentItem.addEventListener('click', () => selectAgent(agent));
+                        agentList.appendChild(agentItem);
                     });
                 }
             }
@@ -51,12 +49,78 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
+    // Function to select an agent
+    async function selectAgent(agent) {
+        // Update current agent
+        currentAgent = agent;
+        currentAgentTitle.textContent = agent.name || agent.username;
+        
+        // Update active state in sidebar
+        document.querySelectorAll('.agent-item').forEach(item => {
+            item.classList.remove('active');
+            if (item.dataset.username === agent.username) {
+                item.classList.add('active');
+            }
+        });
+        
+        // Clear chat messages
+        chatMessages.innerHTML = '';
+        
+        // If this is the first time selecting this agent, get their greeting
+        if (!chatHistories.has(agent.username)) {
+            chatHistories.set(agent.username, []);
+            await getAgentGreeting(agent);
+        } else {
+            // Display existing chat history
+            const history = chatHistories.get(agent.username);
+            for (const message of history) {
+                // Check if the message has an isUser property
+                const isUser = message.isUser === true;
+                addMessage(message, isUser);
+            }
+        }
+    }
+    
+    // Function to get agent's greeting
+    async function getAgentGreeting(agent) {
+        try {
+            const response = await fetch('/generate-text', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    prompt: "Please introduce yourself briefly.",
+                    agent_username: agent.username
+                })
+            });
+            
+            if (response.ok) {
+                const data = await response.json();
+                if (data.status === 'success') {
+                    const greeting = data.data;
+                    addMessage(greeting, false);
+                    chatHistories.get(agent.username).push(greeting);
+                }
+            }
+        } catch (error) {
+            console.error('Error getting agent greeting:', error);
+        }
+    }
+    
     // Function to send message
     async function sendMessage() {
+        if (!currentAgent) {
+            alert('Please select an agent first');
+            return;
+        }
+        
         const message = userInput.value.trim();
         if (message) {
             // Add user message to chat
-            addMessage(message, true);
+            const userMessage = { text: message, is_image: false, isUser: true };
+            addMessage(userMessage, true);
+            chatHistories.get(currentAgent.username).push(userMessage);
             
             // Clear input
             userInput.value = '';
@@ -69,15 +133,12 @@ document.addEventListener('DOMContentLoaded', () => {
             showTypingIndicator();
             
             try {
-                // Get selected agent
-                const selectedAgent = agentSelect.value;
-                
-                // Determine endpoint based on selected agent
+                // Determine endpoint based on message content
                 let endpoint = '/generate-text';
-                if (selectedAgent === 'midjourney') {
+                if (message.toLowerCase().includes('generate an image') || 
+                    message.toLowerCase().includes('create an image') || 
+                    message.toLowerCase().includes('draw')) {
                     endpoint = '/generate';
-                } else if (selectedAgent === 'workflow') {
-                    endpoint = '/run-workflow';
                 }
                 
                 // Send message to backend
@@ -88,7 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     },
                     body: JSON.stringify({
                         prompt: message,
-                        agent_username: selectedAgent
+                        agent_username: currentAgent.username
                     })
                 });
                 
@@ -100,21 +161,29 @@ document.addEventListener('DOMContentLoaded', () => {
                     
                     if (data.status === 'success') {
                         // Add agent response to chat
-                        addMessage(data.data, false);
+                        const agentMessage = { ...data.data, isUser: false };
+                        addMessage(agentMessage, false);
+                        chatHistories.get(currentAgent.username).push(agentMessage);
                     } else {
                         // Handle error
-                        addMessage({ text: `Error: ${data.error}`, is_image: false }, false);
+                        const errorMessage = { text: `Error: ${data.error}`, is_image: false, isUser: false };
+                        addMessage(errorMessage, false);
+                        chatHistories.get(currentAgent.username).push(errorMessage);
                     }
                 } else {
                     // Handle HTTP error
-                    addMessage({ text: 'Error: Failed to get response from server', is_image: false }, false);
+                    const errorMessage = { text: 'Error: Failed to get response from server', is_image: false, isUser: false };
+                    addMessage(errorMessage, false);
+                    chatHistories.get(currentAgent.username).push(errorMessage);
                 }
             } catch (error) {
                 // Hide typing indicator
                 hideTypingIndicator();
                 
                 // Handle network error
-                addMessage({ text: `Error: ${error.message}`, is_image: false }, false);
+                const errorMessage = { text: `Error: ${error.message}`, is_image: false, isUser: false };
+                addMessage(errorMessage, false);
+                chatHistories.get(currentAgent.username).push(errorMessage);
             }
             
             // Re-enable input and button
@@ -131,7 +200,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (isUser) {
             // User message is just text
-            messageDiv.textContent = message;
+            messageDiv.textContent = message.text;
         } else {
             // Bot message might contain text and/or image
             if (message.is_image) {
