@@ -117,6 +117,10 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const message = userInput.value.trim();
         if (message) {
+            // Disable input and button while waiting for response
+            userInput.disabled = true;
+            sendButton.disabled = true;
+            
             // Add user message to chat
             const userMessage = { text: message, is_image: false, isUser: true };
             addMessage(userMessage, true);
@@ -125,21 +129,12 @@ document.addEventListener('DOMContentLoaded', () => {
             // Clear input
             userInput.value = '';
             
-            // Disable input and button while waiting for response
-            userInput.disabled = true;
-            sendButton.disabled = true;
-            
             // Show typing indicator
             showTypingIndicator();
             
             try {
                 // Determine endpoint based on message content
                 let endpoint = '/generate-text';
-                if (message.toLowerCase().includes('generate an image') || 
-                    message.toLowerCase().includes('create an image') || 
-                    message.toLowerCase().includes('draw')) {
-                    endpoint = '/generate';
-                }
                 
                 // Send message to backend
                 const response = await fetch(endpoint, {
