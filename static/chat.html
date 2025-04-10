@@ -10,6 +10,14 @@
     <div class="chat-container">
         <div class="chat-header">
             <h1>AI Agent Chat</h1>
+            <div class="agent-selector">
+                <label for="agent-select">Select Agent:</label>
+                <select id="agent-select">
+                    <option value="gpt">GPT Assistant</option>
+                    <option value="midjourney">Midjourney Artist</option>
+                    <option value="workflow">Workflow Agent</option>
+                </select>
+            </div>
         </div>
         <div class="chat-messages" id="chat-messages">
             <!-- Messages will be added here dynamically -->

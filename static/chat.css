@@ -175,4 +175,38 @@ body {
     margin-bottom: 10px;
     max-width: 80%;
     align-self: flex-start;
+}
+
+/* Add styles for agent selector */
+.agent-selector {
+    margin: 10px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.agent-selector label {
+    color: #666;
+    font-size: 14px;
+}
+
+.agent-selector select {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    background-color: white;
+    font-size: 14px;
+    color: #333;
+    cursor: pointer;
+    transition: border-color 0.3s;
+}
+
+.agent-selector select:hover {
+    border-color: #999;
+}
+
+.agent-selector select:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
 } 

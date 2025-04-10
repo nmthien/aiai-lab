@@ -5,13 +5,25 @@ from dotenv import load_dotenv
 from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from openai import OpenAI
+from pymongo import MongoClient
 
 app = Flask(__name__, static_folder='static')
 CORS(app)  # Enable CORS for all routes
 
+# Load environment variables
+load_dotenv()
+
+# MongoDB connection
+MONGO_URI = os.getenv('MONGO_URI')
+if not MONGO_URI:
+    raise ValueError("MONGO_URI environment variable is not set")
+
+client = MongoClient(MONGO_URI)
+db = client.aiai
+agents_collection = db.agents
+
 class MidjourneyAgent:
     def __init__(self):
-        load_dotenv()
         self.api_key = os.getenv('GOAPI_API_KEY')
         self.openai_key = os.getenv('OPENAI_API_KEY')
         self.base_url = "https://api.goapi.ai/api/v1/task"
@@ -125,13 +137,14 @@ class MidjourneyAgent:
          print("Task timed out")
          return None
 
-    def generate_text(self, prompt: str, model: str = "gpt-4o") -> dict:
+    def generate_text(self, prompt: str, model: str = "gpt-4o", agent_username: str = None) -> dict:
         """
         Generate text response using OpenAI API or image using Midjourney if requested
         
         Args:
             prompt (str): The prompt for text generation or image description
             model (str): The OpenAI model to use (default: gpt-4o)
+            agent_username (str): The username of the agent to use for the conversation
             
         Returns:
             dict: Response containing the generated text/image and status
@@ -175,26 +188,42 @@ class MidjourneyAgent:
         
         # If not an image request, proceed with text generation
         try:
-            response = self.openai_client.responses.create(
+            # If agent_username is provided, fetch the agent profile from MongoDB
+            system_prompt = "You are a helpful AI assistant."
+            if agent_username:
+                agent = agents_collection.find_one({"username": agent_username})
+                if agent:
+                    # Construct system prompt from agent profile
+                    system_prompt = f"""You are {agent.get('identity', 'an AI assistant')}.
+Your knowledge includes: {agent.get('knowledge', 'general information')}.
+You specialize in: {agent.get('topic', 'general assistance')}.
+Your voice tone is: {agent.get('voice_tone', 'professional and friendly')}.
+Please respond to the user in this voice tone and from this perspective."""
+            
+            # Create messages array with system and user messages
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": prompt}
+            ]
+            
+            # Call OpenAI API with the constructed messages
+            response = self.openai_client.chat.completions.create(
                 model=model,
-                input=prompt
+                messages=messages,
+                max_tokens=1000,
+                temperature=0.7
             )
             
-            # Extract the text from the nested response structure
-            if response.status == "completed" and response.output:
-                # The output is a list of messages, we take the first one
-                message = response.output[0]
-                if message.content:
-                    # The content is a list of content items, we take the first one
-                    content_item = message.content[0]
-                    if content_item.type == "output_text":
-                        return {
-                            "status": "success",
-                            "data": {
-                                "text": content_item.text,
-                                "is_image": False
-                            }
-                        }
+            # Extract the text from the response
+            if response.choices and len(response.choices) > 0:
+                text = response.choices[0].message.content
+                return {
+                    "status": "success",
+                    "data": {
+                        "text": text,
+                        "is_image": False
+                    }
+                }
             
             # If we couldn't extract the text properly
             return {
@@ -220,6 +249,18 @@ def chat():
     """Serve the chat interface"""
     return send_from_directory('static', 'chat.html')
 
+@app.route('/agents', methods=['GET'])
+def get_agents():
+    """Get list of available agents from MongoDB"""
+    try:
+        # Query for specific usernames
+        usernames = ["real3Pham", "thedarklady___", "Pokka_AIAI", "tHeyCallMeRah", "kenkaneki_ai"]
+        agents = list(agents_collection.find({"username": {"$in": usernames}}, {"_id": 0, "username": 1, "name": 1}))
+        return jsonify({"status": "success", "data": agents})
+    except Exception as e:
+        print(f"Error fetching agents: {str(e)}")
+        return jsonify({"status": "error", "error": str(e)}), 500
+
 @app.route('/generate', methods=['POST'])
 def generate_image():
     data = request.get_json()
@@ -240,11 +281,12 @@ def generate_text():
     data = request.get_json()
     prompt = data.get('prompt')
     model = data.get('model', 'gpt-4o')
+    agent_username = data.get('agent_username')
     
     if not prompt:
         return jsonify({'error': 'Prompt is required'}), 400
     
-    result = agent.generate_text(prompt, model)
+    result = agent.generate_text(prompt, model, agent_username)
     return jsonify(result)
 
 @app.route('/run-workflow', methods=['POST'])
@@ -254,12 +296,13 @@ def run_workflow():
     """
     data = request.get_json()
     prompt = data.get('prompt')
+    agent_username = data.get('agent_username')
     
     if not prompt:
         return jsonify({'error': 'Prompt is required'}), 400
     
     # First, generate text response
-    text_result = agent.generate_text(prompt)
+    text_result = agent.generate_text(prompt, agent_username=agent_username)
     if text_result.get('status') == 'error':
         return jsonify(text_result), 500
     

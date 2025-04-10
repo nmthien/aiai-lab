@@ -2,6 +2,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const chatMessages = document.getElementById('chat-messages');
     const userInput = document.getElementById('user-input');
     const sendButton = document.getElementById('send-button');
+    const agentSelect = document.getElementById('agent-select');
+    
+    // Fetch agents from backend and populate dropdown
+    fetchAgents();
     
     // Add welcome message
     addMessage({ text: 'Hello! I am your AI assistant. How can I help you today?', is_image: false }, false);
@@ -16,6 +20,36 @@ document.addEventListener('DOMContentLoaded', () => {
             sendMessage();
         }
     });
+    
+    // Function to fetch agents from backend
+    async function fetchAgents() {
+        try {
+            const response = await fetch('/agents');
+            if (response.ok) {
+                const data = await response.json();
+                if (data.status === 'success') {
+                    // Clear existing options
+                    agentSelect.innerHTML = '';
+                    
+                    // Add default option
+                    const defaultOption = document.createElement('option');
+                    defaultOption.value = '';
+                    defaultOption.textContent = 'Select an Agent';
+                    agentSelect.appendChild(defaultOption);
+                    
+                    // Add agents from database
+                    data.data.forEach(agent => {
+                        const option = document.createElement('option');
+                        option.value = agent.username;
+                        option.textContent = agent.name || agent.username;
+                        agentSelect.appendChild(option);
+                    });
+                }
+            }
+        } catch (error) {
+            console.error('Error fetching agents:', error);
+        }
+    }
     
     // Function to send message
     async function sendMessage() {
@@ -35,14 +69,26 @@ document.addEventListener('DOMContentLoaded', () => {
             showTypingIndicator();
             
             try {
+                // Get selected agent
+                const selectedAgent = agentSelect.value;
+                
+                // Determine endpoint based on selected agent
+                let endpoint = '/generate-text';
+                if (selectedAgent === 'midjourney') {
+                    endpoint = '/generate';
+                } else if (selectedAgent === 'workflow') {
+                    endpoint = '/run-workflow';
+                }
+                
                 // Send message to backend
-                const response = await fetch('/generate-text', {
+                const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
                     body: JSON.stringify({
-                        prompt: message
+                        prompt: message,
+                        agent_username: selectedAgent
                     })
                 });
                 
