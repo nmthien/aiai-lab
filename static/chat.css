@@ -121,7 +121,49 @@ body {
 .generated-image {
     max-width: 100%;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin-top: 10px;
+}
+
+.image-wrapper {
+    position: relative;
+    display: inline-block;
+    margin-top: 10px;
+}
+
+.download-btn {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background-color: rgba(255, 255, 255, 0.8);
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.2);
+    color: #333;
+    border: none;
+    padding: 0;
+    outline: none;
+}
+
+.download-btn:hover {
+    background-color: rgba(255, 255, 255, 1);
+    transform: scale(1.1);
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.3);
+}
+
+.download-btn:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.5);
+}
+
+.download-btn svg {
+    width: 20px;
+    height: 20px;
 }
 
 .chat-input {
@@ -260,4 +302,36 @@ body {
     outline: none;
     border-color: #007bff;
     box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+}
+
+.image-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    grid-gap: 15px;
+    margin-top: 15px;
+    width: 100%;
+}
+
+.image-grid .image-wrapper {
+    position: relative;
+    width: 100%;
+    margin-top: 0;
+}
+
+.image-grid .generated-image {
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+    margin-top: 0;
+}
+
+.image-grid .download-btn {
+    top: 10px;
+    right: 10px;
+}
+
+@media (max-width: 768px) {
+    .image-grid {
+        grid-template-columns: 1fr;
+    }
 } 

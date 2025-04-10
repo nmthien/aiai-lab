@@ -251,61 +251,67 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Image generation completed
                         clearInterval(pollInterval);
                         
-                        // Update the message with the image
+                        // Create a message object with the image(s)
+                        const imageMessage = {
+                            text: "Here are the images you requested:",
+                            is_image: true,
+                            isUser: false
+                        };
+                        
+                        // Check if we have multiple image URLs
+                        if (data.data && data.data.output && data.data.output.image_urls && 
+                            Array.isArray(data.data.output.image_urls) && 
+                            data.data.output.image_urls.length > 0) {
+                            // Use the array of image URLs
+                            imageMessage.image_urls = data.data.output.image_urls;
+                        } else if (data.image_url) {
+                            // Fallback to single image URL (backward compatibility)
+                            imageMessage.image_url = data.image_url;
+                        }
+                        
+                        // Find and remove the original message div
                         const messageDiv = document.querySelector(`.message[data-task-id="${taskId}"]`);
                         if (messageDiv) {
-                            // Create a container for the image response
-                            const imageContainer = document.createElement('div');
-                            imageContainer.className = 'image-response';
-                            
-                            // Add the text message
-                            const textDiv = document.createElement('div');
-                            textDiv.className = 'message-text';
-                            textDiv.textContent = "Here's the image you requested:";
-                            imageContainer.appendChild(textDiv);
-                            
-                            // Add the image
-                            const img = document.createElement('img');
-                            img.src = data.image_url;
-                            img.alt = 'Generated image';
-                            img.className = 'generated-image';
-                            imageContainer.appendChild(img);
-                            
-                            // Replace the message content
-                            messageDiv.innerHTML = '';
-                            messageDiv.appendChild(imageContainer);
-                            
-                            // Update the chat history
-                            const history = chatHistories.get(currentAgent.username);
-                            const messageIndex = history.findIndex(msg => msg.task_id === taskId);
-                            if (messageIndex !== -1) {
-                                history[messageIndex] = {
-                                    text: "Here's the image you requested:",
-                                    image_url: data.image_url,
-                                    is_image: true,
-                                    isUser: false
-                                };
-                            }
+                            messageDiv.remove();
+                        }
+                        
+                        // Add the new message with images
+                        addMessage(imageMessage, false);
+                        
+                        // Update the chat history
+                        const history = chatHistories.get(currentAgent.username);
+                        const messageIndex = history.findIndex(msg => msg.task_id === taskId);
+                        if (messageIndex !== -1) {
+                            // Remove the task_id from the history entry
+                            const updatedMessage = {...imageMessage};
+                            delete updatedMessage.task_id;
+                            history[messageIndex] = updatedMessage;
                         }
                     } else if (data.status === 'failed') {
                         // Image generation failed
                         clearInterval(pollInterval);
                         
-                        // Update the message with the error
+                        // Create an error message
+                        const errorMessage = {
+                            text: `Error: ${data.error}`,
+                            is_image: false,
+                            isUser: false
+                        };
+                        
+                        // Find and remove the original message div
                         const messageDiv = document.querySelector(`.message[data-task-id="${taskId}"]`);
                         if (messageDiv) {
-                            messageDiv.textContent = `Error: ${data.error}`;
-                            
-                            // Update the chat history
-                            const history = chatHistories.get(currentAgent.username);
-                            const messageIndex = history.findIndex(msg => msg.task_id === taskId);
-                            if (messageIndex !== -1) {
-                                history[messageIndex] = {
-                                    text: `Error: ${data.error}`,
-                                    is_image: false,
-                                    isUser: false
-                                };
-                            }
+                            messageDiv.remove();
+                        }
+                        
+                        // Add the error message
+                        addMessage(errorMessage, false);
+                        
+                        // Update the chat history
+                        const history = chatHistories.get(currentAgent.username);
+                        const messageIndex = history.findIndex(msg => msg.task_id === taskId);
+                        if (messageIndex !== -1) {
+                            history[messageIndex] = errorMessage;
                         }
                     } else {
                         // Still processing
@@ -320,21 +326,27 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (attempts >= maxAttempts) {
                     clearInterval(pollInterval);
                     
-                    // Update the message with a timeout error
+                    // Create a timeout error message
+                    const timeoutMessage = {
+                        text: "Error: Image generation timed out. Please try again.",
+                        is_image: false,
+                        isUser: false
+                    };
+                    
+                    // Find and remove the original message div
                     const messageDiv = document.querySelector(`.message[data-task-id="${taskId}"]`);
                     if (messageDiv) {
-                        messageDiv.textContent = "Error: Image generation timed out. Please try again.";
-                        
-                        // Update the chat history
-                        const history = chatHistories.get(currentAgent.username);
-                        const messageIndex = history.findIndex(msg => msg.task_id === taskId);
-                        if (messageIndex !== -1) {
-                            history[messageIndex] = {
-                                text: "Error: Image generation timed out. Please try again.",
-                                is_image: false,
-                                isUser: false
-                            };
-                        }
+                        messageDiv.remove();
+                    }
+                    
+                    // Add the timeout error message
+                    addMessage(timeoutMessage, false);
+                    
+                    // Update the chat history
+                    const history = chatHistories.get(currentAgent.username);
+                    const messageIndex = history.findIndex(msg => msg.task_id === taskId);
+                    if (messageIndex !== -1) {
+                        history[messageIndex] = timeoutMessage;
                     }
                 }
             } catch (error) {
@@ -369,12 +381,96 @@ document.addEventListener('DOMContentLoaded', () => {
                 textDiv.textContent = message.text;
                 imageContainer.appendChild(textDiv);
                 
-                // Add the image
-                const img = document.createElement('img');
-                img.src = message.image_url;
-                img.alt = 'Generated image';
-                img.className = 'generated-image';
-                imageContainer.appendChild(img);
+                // Check if we have multiple image URLs
+                if (message.image_urls && Array.isArray(message.image_urls) && message.image_urls.length > 0) {
+                    // Create a grid container for multiple images
+                    const imageGrid = document.createElement('div');
+                    imageGrid.className = 'image-grid';
+                    
+                    // Add each image to the grid
+                    message.image_urls.forEach((imageUrl, index) => {
+                        // Create a container for each image and its download button
+                        const imageWrapper = document.createElement('div');
+                        imageWrapper.className = 'image-wrapper';
+                        
+                        // Add the image
+                        const img = document.createElement('img');
+                        img.src = imageUrl;
+                        img.alt = `Generated image ${index + 1}`;
+                        img.className = 'generated-image';
+                        imageWrapper.appendChild(img);
+                        
+                        // Add download button
+                        const downloadBtn = document.createElement('button');
+                        downloadBtn.className = 'download-btn';
+                        downloadBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>';
+                        downloadBtn.title = 'Download image';
+                        
+                        // Add click event to handle download
+                        downloadBtn.addEventListener('click', () => {
+                            // Create a download link
+                            const a = document.createElement('a');
+                            a.href = imageUrl;
+                            a.download = `generated-image-${index + 1}.png`;
+                            a.target = '_blank';
+                            a.rel = 'noopener noreferrer';
+                            
+                            // Append to body, click, and remove
+                            document.body.appendChild(a);
+                            a.click();
+                            
+                            // Clean up
+                            setTimeout(() => {
+                                document.body.removeChild(a);
+                            }, 100);
+                        });
+                        
+                        imageWrapper.appendChild(downloadBtn);
+                        imageGrid.appendChild(imageWrapper);
+                    });
+                    
+                    imageContainer.appendChild(imageGrid);
+                } else if (message.image_url) {
+                    // Handle single image (backward compatibility)
+                    // Create a container for the image and download button
+                    const imageWrapper = document.createElement('div');
+                    imageWrapper.className = 'image-wrapper';
+                    
+                    // Add the image
+                    const img = document.createElement('img');
+                    img.src = message.image_url;
+                    img.alt = 'Generated image';
+                    img.className = 'generated-image';
+                    imageWrapper.appendChild(img);
+                    
+                    // Add download button
+                    const downloadBtn = document.createElement('button');
+                    downloadBtn.className = 'download-btn';
+                    downloadBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>';
+                    downloadBtn.title = 'Download image';
+                    
+                    // Add click event to handle download
+                    downloadBtn.addEventListener('click', () => {
+                        // Create a download link
+                        const a = document.createElement('a');
+                        a.href = message.image_url;
+                        a.download = 'generated-image.png';
+                        a.target = '_blank';
+                        a.rel = 'noopener noreferrer';
+                        
+                        // Append to body, click, and remove
+                        document.body.appendChild(a);
+                        a.click();
+                        
+                        // Clean up
+                        setTimeout(() => {
+                            document.body.removeChild(a);
+                        }, 100);
+                    });
+                    
+                    imageWrapper.appendChild(downloadBtn);
+                    imageContainer.appendChild(imageWrapper);
+                }
                 
                 messageDiv.appendChild(imageContainer);
             } else {

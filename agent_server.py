@@ -362,11 +362,29 @@ def check_status(task_id):
     if result.get('code') == 200:
         status = result['data']['status']
         if status == 'completed':
-            image_url = result['data']['output']['image_url']
-            return jsonify({
-                'status': 'completed',
-                'image_url': image_url
-            })
+            # Check if we have multiple image URLs
+            if 'image_urls' in result['data']['output'] and isinstance(result['data']['output']['image_urls'], list):
+                image_urls = result['data']['output']['image_urls']
+                return jsonify({
+                    'status': 'completed',
+                    'data': {
+                        'output': {
+                            'image_urls': image_urls
+                        }
+                    }
+                })
+            # Fallback to single image URL for backward compatibility
+            elif 'image_url' in result['data']['output']:
+                image_url = result['data']['output']['image_url']
+                return jsonify({
+                    'status': 'completed',
+                    'image_url': image_url
+                })
+            else:
+                return jsonify({
+                    'status': 'failed',
+                    'error': 'No image URLs found in the response'
+                })
         elif status == 'failed':
             error_message = result['data']['error']['message']
             return jsonify({
