@@ -36,83 +36,94 @@ class MidjourneyAgent:
             dict: Response from the API containing task ID and status
         """
         headers = {
-            "Authorization": f"Bearer {self.api_key}",
+            "x-api-key": self.api_key,
             "Content-Type": "application/json"
         }
         
         payload = {
-            "type": "imagine",
-            "config": {
-                "service_mode": "private"
-            },
+            "model": "midjourney",
+            "task_type": "imagine",
             "input": {
-                "prompt": prompt
+                "prompt": prompt,
+                "aspect_ratio": "1:1",
+                "process_mode": "fast",
+                "skip_prompt_check": False
+            },
+            "config": {
+                "service_mode": "private",
+                "webhook_config": {
+                    "endpoint": "",
+                    "secret": ""
+                }
             }
         }
-        
+ 
         try:
-            print(f"Sending request to Midjourney API: {payload}")  # Debug print   
+            print(f"Sending request to Midjourney API: {payload}")  # Debug print
             response = requests.post(
                 self.base_url,
                 headers=headers,
                 json=payload
             )
-            
-            if response.status_code == 200:
-                result = response.json()
-                print(f"API Response: {result}")  # Debug print
-                return result
-            else:
-                print(f"Error: {response.status_code} - {response.text}")
-                return None
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.RequestException as e:
+            print(f"Error generating image: {str(e)}")
+            return None
                 
         except Exception as e:
             print(f"Exception occurred: {str(e)}")
             return None
 
-    def wait_for_task_completion(self, task_id: str, timeout: int = 300) -> dict:
-        """
-        Wait for a task to complete and return the result
-        
-        Args:
-            task_id (str): The ID of the task to check
-            timeout (int): Maximum time to wait in seconds
-            
-        Returns:
-            dict: The final result of the task
-        """
-        headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
-        
-        start_time = time.time()
-        while time.time() - start_time < timeout:
-            try:
-                response = requests.get(
-                    f"{self.base_url}/{task_id}",
-                    headers=headers
-                )
-                
-                if response.status_code == 200:
-                    result = response.json()
-                    if result and result.get('code') == 200:
-                        status = result['data']['status']
-                        if status == 'completed':
-                            print(f"Task completed successfully: {result}")  # Debug print
-                            return result
-                        elif status == 'failed':
-                            print(f"Task failed: {result['data']['error']['message']}")
-                            return None
-                
-                time.sleep(5)  # Wait 5 seconds before checking again
-                
-            except Exception as e:
-                print(f"Error checking task status: {str(e)}")
-                return None
-        
-        print("Task timed out")
-        return None
+    def check_task_status(self, task_id: str) -> dict:
+         """
+         Check the status of a task and retrieve the result if completed.
+         
+         Args:
+             task_id (str): The ID of the task to check
+             
+         Returns:
+             dict: Response containing the task status and result if completed
+         """
+         headers = {
+             "x-api-key": self.api_key
+         }
+ 
+         try:
+             response = requests.get(
+                 f"{self.base_url}/{task_id}",
+                 headers=headers
+             )
+             response.raise_for_status()
+             return response.json()
+         except requests.exceptions.RequestException as e:
+             print(f"Error checking task status: {str(e)}")
+             return None
+         
+    def wait_for_task_completion(self, task_id: str, max_attempts: int = 30, delay: int = 10) -> dict:
+         """
+         Wait for a task to complete and retrieve the final result.
+         
+         Args:
+             task_id (str): The ID of the task to wait for
+             max_attempts (int): Maximum number of attempts to check the task status
+             delay (int): Delay between attempts in seconds
+             
+         Returns:
+             dict: Response containing the task result if completed, None otherwise
+         """
+         for attempt in range(max_attempts):
+             result = self.check_task_status(task_id)
+             if result and result.get('code') == 200:
+                 status = result['data']['status']
+                 if status == 'completed':
+                     return result
+                 elif status == 'failed':
+                     print(f"Task failed: {result['data']['error']['message']}")
+                     return None
+             time.sleep(delay)
+         print("Task timed out")
+         return None
 
     def generate_text(self, prompt: str, model: str = "gpt-4o") -> dict:
         """
