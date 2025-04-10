@@ -16,20 +16,41 @@ CORS(app)  # Enable CORS for all routes
 # Load environment variables
 load_dotenv()
 
-# MongoDB connection with timeout settings
+# MongoDB connection with retry logic
 MONGO_URI = os.getenv('MONGO_URI')
 if not MONGO_URI:
     raise ValueError("MONGO_URI environment variable is not set")
 
+def connect_to_mongodb(max_retries=3, retry_delay=2):
+    for attempt in range(max_retries):
+        try:
+            # Use the newer connection string format
+            client = MongoClient(
+                MONGO_URI,
+                serverSelectionTimeoutMS=10000,  # Increased timeout
+                connectTimeoutMS=10000,
+                retryWrites=True,
+                retryReads=True
+            )
+            # Test the connection
+            client.server_info()
+            print(f"Successfully connected to MongoDB on attempt {attempt + 1}")
+            return client
+        except (ConnectionFailure, ServerSelectionTimeoutError) as e:
+            print(f"Attempt {attempt + 1} failed: {str(e)}")
+            if attempt < max_retries - 1:
+                print(f"Retrying in {retry_delay} seconds...")
+                time.sleep(retry_delay)
+            else:
+                print("All connection attempts failed")
+                raise
+
 try:
-    client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000, connectTimeoutMS=5000)
-    # Test the connection
-    client.server_info()
+    client = connect_to_mongodb()
     db = client.aiai
     agents_collection = db.agents
-    print("Successfully connected to MongoDB")
-except (ConnectionFailure, ServerSelectionTimeoutError) as e:
-    print(f"Failed to connect to MongoDB: {str(e)}")
+except Exception as e:
+    print(f"Failed to establish MongoDB connection: {str(e)}")
     raise
 
 # Security headers
@@ -277,20 +298,36 @@ def get_agents():
     """Get list of available agents from MongoDB"""
     try:
         print("Fetching agents from MongoDB...")
-        # Query for specific usernames with timeout
-        agents = list(agents_collection.find(
-            {"username": {"$in": AGENT_USERNAMES}},
-            {"_id": 0, "username": 1, "name": 1}
-        ).max_time_ms(5000))  # 5 second timeout
+        # Query for specific usernames with timeout and retry
+        max_retries = 3
+        retry_delay = 2
         
-        print(f"Found {len(agents)} agents")
-        return jsonify({"status": "success", "data": agents})
-    except ServerSelectionTimeoutError as e:
-        print(f"MongoDB timeout error: {str(e)}")
-        return jsonify({"status": "error", "error": "Database connection timeout"}), 503
+        for attempt in range(max_retries):
+            try:
+                agents = list(agents_collection.find(
+                    {"username": {"$in": AGENT_USERNAMES}},
+                    {"_id": 0, "username": 1, "name": 1}
+                ).max_time_ms(10000))  # Increased timeout
+                
+                print(f"Found {len(agents)} agents")
+                return jsonify({"status": "success", "data": agents})
+            except ServerSelectionTimeoutError as e:
+                print(f"Attempt {attempt + 1} failed: {str(e)}")
+                if attempt < max_retries - 1:
+                    print(f"Retrying in {retry_delay} seconds...")
+                    time.sleep(retry_delay)
+                else:
+                    print("All attempts failed")
+                    return jsonify({
+                        "status": "error",
+                        "error": "Database connection timeout. Please try again later."
+                    }), 503
     except Exception as e:
         print(f"Error fetching agents: {str(e)}")
-        return jsonify({"status": "error", "error": str(e)}), 500
+        return jsonify({
+            "status": "error",
+            "error": "An unexpected error occurred. Please try again later."
+        }), 500
 
 @app.route('/generate', methods=['POST'])
 def generate_image():

@@ -1,6 +1,45 @@
 # Multi-Agents Playground
 
-A project for experimenting with various AI agents, including a Midjourney image generation agent.
+A Flask application that provides a chat interface for interacting with various AI agents.
+
+## Features
+
+- Chat interface with multiple AI agents
+- Image generation using Midjourney
+- Text generation using OpenAI
+- MongoDB integration for agent profiles
+
+## Deployment on Render
+
+1. Fork this repository
+2. Create a new Web Service on Render
+3. Connect your GitHub repository
+4. Configure the following environment variables:
+   - `MONGO_URI`: Your MongoDB connection string
+   - `OPENAI_API_KEY`: Your OpenAI API key
+   - `GOAPI_API_KEY`: Your GoAPI key for Midjourney
+
+## Local Development
+
+1. Clone the repository
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. Create a `.env` file with your environment variables
+4. Run the application:
+   ```bash
+   python agent_server.py
+   ```
+
+## Environment Variables
+
+Create a `.env` file with the following variables:
+```
+MONGO_URI=your_mongodb_uri
+OPENAI_API_KEY=your_openai_key
+GOAPI_API_KEY=your_goapi_key
+```
 
 ## Midjourney Agent
 
