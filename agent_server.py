@@ -2,10 +2,11 @@ import os
 import requests
 import time
 from dotenv import load_dotenv
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, make_response
 from flask_cors import CORS
 from openai import OpenAI
 from pymongo import MongoClient
+from pymongo.errors import ConnectionFailure, ServerSelectionTimeoutError
 from image_keywords import IMAGE_GENERATION_KEYWORDS
 from agent_usernames import AGENT_USERNAMES
 
@@ -15,14 +16,31 @@ CORS(app)  # Enable CORS for all routes
 # Load environment variables
 load_dotenv()
 
-# MongoDB connection
+# MongoDB connection with timeout settings
 MONGO_URI = os.getenv('MONGO_URI')
 if not MONGO_URI:
     raise ValueError("MONGO_URI environment variable is not set")
 
-client = MongoClient(MONGO_URI)
-db = client.aiai
-agents_collection = db.agents
+try:
+    client = MongoClient(MONGO_URI, serverSelectionTimeoutMS=5000, connectTimeoutMS=5000)
+    # Test the connection
+    client.server_info()
+    db = client.aiai
+    agents_collection = db.agents
+    print("Successfully connected to MongoDB")
+except (ConnectionFailure, ServerSelectionTimeoutError) as e:
+    print(f"Failed to connect to MongoDB: {str(e)}")
+    raise
+
+# Security headers
+@app.after_request
+def add_security_headers(response):
+    response.headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https://api.openai.com https://api.goapi.ai;"
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'SAMEORIGIN'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    return response
 
 class MidjourneyAgent:
     def __init__(self):
@@ -258,9 +276,18 @@ def chat():
 def get_agents():
     """Get list of available agents from MongoDB"""
     try:
-        # Query for specific usernames
-        agents = list(agents_collection.find({"username": {"$in": AGENT_USERNAMES}}, {"_id": 0, "username": 1, "name": 1}))
+        print("Fetching agents from MongoDB...")
+        # Query for specific usernames with timeout
+        agents = list(agents_collection.find(
+            {"username": {"$in": AGENT_USERNAMES}},
+            {"_id": 0, "username": 1, "name": 1}
+        ).max_time_ms(5000))  # 5 second timeout
+        
+        print(f"Found {len(agents)} agents")
         return jsonify({"status": "success", "data": agents})
+    except ServerSelectionTimeoutError as e:
+        print(f"MongoDB timeout error: {str(e)}")
+        return jsonify({"status": "error", "error": "Database connection timeout"}), 503
     except Exception as e:
         print(f"Error fetching agents: {str(e)}")
         return jsonify({"status": "error", "error": str(e)}), 500
