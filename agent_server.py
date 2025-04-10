@@ -153,7 +153,7 @@ class MidjourneyAgent:
              print(f"Error checking task status: {str(e)}")
              return None
          
-    def wait_for_task_completion(self, task_id: str, max_attempts: int = 30, delay: int = 10) -> dict:
+    def wait_for_task_completion(self, task_id: str, max_attempts: int = 12, delay: int = 5) -> dict:
          """
          Wait for a task to complete and retrieve the final result.
          
@@ -166,16 +166,26 @@ class MidjourneyAgent:
              dict: Response containing the task result if completed, None otherwise
          """
          for attempt in range(max_attempts):
-             result = self.check_task_status(task_id)
-             if result and result.get('code') == 200:
-                 status = result['data']['status']
-                 if status == 'completed':
-                     return result
-                 elif status == 'failed':
-                     print(f"Task failed: {result['data']['error']['message']}")
-                     return None
+             try:
+                 result = self.check_task_status(task_id)
+                 if result and result.get('code') == 200:
+                     status = result['data']['status']
+                     if status == 'completed':
+                         return result
+                     elif status == 'failed':
+                         print(f"Task failed: {result['data']['error']['message']}")
+                         return None
+                     elif status == 'processing':
+                         print(f"Task still processing (attempt {attempt+1}/{max_attempts})")
+                 else:
+                     print(f"Unexpected response format: {result}")
+             except Exception as e:
+                 print(f"Error checking task status: {str(e)}")
+             
+             # Sleep between attempts
              time.sleep(delay)
-         print("Task timed out")
+         
+         print("Task timed out after maximum attempts")
          return None
 
     def generate_text(self, prompt: str, model: str = "gpt-4o", agent_username: str = None) -> dict:
@@ -203,26 +213,15 @@ class MidjourneyAgent:
             result = self.generate_image(image_prompt)
             if result and result.get('code') == 200:
                 task_id = result['data']['task_id']
-                
-                # Wait for the image generation to complete
-                final_result = self.wait_for_task_completion(task_id)
-                if final_result and final_result.get('data', {}).get('output', {}).get('image_url'):
-                    image_url = final_result['data']['output']['image_url']
-                    print(f"Generated image URL: {image_url}")  # Debug print
-                    return {
-                        "status": "success",
-                        "data": {
-                            "text": f"Here's the image you requested:",
-                            "image_url": image_url,
-                            "is_image": True
-                        }
+                # Return immediately with the task ID instead of waiting for completion
+                return {
+                    "status": "processing",
+                    "data": {
+                        "text": "Image generation started. Please check the status endpoint for progress.",
+                        "task_id": task_id,
+                        "is_image": True
                     }
-                else:
-                    print(f"Failed to get image URL from result: {final_result}")  # Debug print
-                    return {
-                        "status": "error",
-                        "error": "Failed to generate image"
-                    }
+                }
             else:
                 print(f"Failed to create image generation task: {result}")  # Debug print
                 return {
@@ -340,9 +339,46 @@ def generate_image():
     result = agent.generate_image(prompt)
     if result and result.get('code') == 200:
         task_id = result['data']['task_id']
-        return jsonify({'task_id': task_id})
+        # Return immediately with the task ID instead of waiting for completion
+        return jsonify({
+            'status': 'processing',
+            'task_id': task_id,
+            'message': 'Image generation started. Use /check-status/{task_id} to check progress.'
+        })
     else:
         return jsonify({'error': 'Failed to create image generation task'}), 500
+
+@app.route('/check-status/<task_id>', methods=['GET'])
+def check_status(task_id):
+    """Check the status of an image generation task"""
+    if not task_id:
+        return jsonify({'error': 'Task ID is required'}), 400
+    
+    result = agent.check_task_status(task_id)
+    if not result:
+        return jsonify({'error': 'Failed to check task status'}), 500
+    
+    if result.get('code') == 200:
+        status = result['data']['status']
+        if status == 'completed':
+            image_url = result['data']['output']['image_url']
+            return jsonify({
+                'status': 'completed',
+                'image_url': image_url
+            })
+        elif status == 'failed':
+            error_message = result['data']['error']['message']
+            return jsonify({
+                'status': 'failed',
+                'error': error_message
+            })
+        else:
+            return jsonify({
+                'status': 'processing',
+                'message': f'Task is still {status}'
+            })
+    else:
+        return jsonify({'error': 'Unexpected response format'}), 500
 
 @app.route('/generate-text', methods=['POST'])
 def generate_text():
@@ -371,11 +407,17 @@ def run_workflow():
     
     # First, generate text response
     text_result = agent.generate_text(prompt, agent_username=agent_username)
+    
+    # If there was an error, return it
     if text_result.get('status') == 'error':
         return jsonify(text_result), 500
     
     # If the text response indicates an image should be generated
     if text_result.get('data', {}).get('is_image'):
+        # If it's a processing status (for image generation), return that
+        if text_result.get('status') == 'processing':
+            return jsonify(text_result)
+        # Otherwise, return the text response
         return jsonify(text_result)
     
     # Otherwise, return the text response
