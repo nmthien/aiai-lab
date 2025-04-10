@@ -535,6 +535,16 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
+        // Check if this is a processing status for image generation
+        if (data.status === 'processing' && data.data && data.data.task_id) {
+            const taskId = data.data.task_id;
+            outputContent.innerHTML = `<p>${data.data.text || 'Image generation in progress...'}</p>`;
+            
+            // Start polling for status
+            pollImageStatus(taskId);
+            return;
+        }
+        
         // Display the output based on its type
         if (data.type === 'text') {
             outputContent.innerHTML = `<p>${data.content}</p>`;
@@ -554,5 +564,48 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             outputContent.innerHTML = `<p>Unknown output type: ${data.type}</p>`;
         }
+    }
+    
+    // Function to poll for image generation status
+    async function pollImageStatus(taskId) {
+        const outputContent = document.getElementById('output-content');
+        const maxAttempts = 60; // 5 minutes with 5-second intervals
+        let attempts = 0;
+        
+        const pollInterval = setInterval(async () => {
+            attempts++;
+            
+            try {
+                const response = await fetch(`/check-status/${taskId}`);
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    
+                    if (data.status === 'completed') {
+                        // Image generation completed
+                        clearInterval(pollInterval);
+                        outputContent.innerHTML = `
+                            <p>Generated Image:</p>
+                            <img src="${data.image_url}" alt="Generated image">
+                        `;
+                    } else if (data.status === 'failed') {
+                        // Image generation failed
+                        clearInterval(pollInterval);
+                        outputContent.innerHTML = `<p>Error: ${data.error}</p>`;
+                    } else {
+                        // Still processing
+                        outputContent.innerHTML = `<p>Image generation in progress... (${attempts}/${maxAttempts})</p>`;
+                    }
+                }
+                
+                // Check if we've reached the maximum number of attempts
+                if (attempts >= maxAttempts) {
+                    clearInterval(pollInterval);
+                    outputContent.innerHTML = `<p>Error: Image generation timed out. Please try again.</p>`;
+                }
+            } catch (error) {
+                console.error('Error polling for image status:', error);
+            }
+        }, 5000); // Poll every 5 seconds
     }
 }); 

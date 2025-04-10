@@ -153,7 +153,7 @@ class MidjourneyAgent:
              print(f"Error checking task status: {str(e)}")
              return None
          
-    def wait_for_task_completion(self, task_id: str, max_attempts: int = 12, delay: int = 5) -> dict:
+    def wait_for_task_completion(self, task_id: str, max_attempts: int = 30, delay: int = 5) -> dict:
          """
          Wait for a task to complete and retrieve the final result.
          
@@ -167,6 +167,7 @@ class MidjourneyAgent:
          """
          for attempt in range(max_attempts):
              try:
+                 print(f"Checking task status for {task_id} (attempt {attempt+1}/{max_attempts})")
                  result = self.check_task_status(task_id)
                  if result and result.get('code') == 200:
                      status = result['data']['status']
@@ -217,7 +218,7 @@ class MidjourneyAgent:
                 return {
                     "status": "processing",
                     "data": {
-                        "text": "Image generation started. Please check the status endpoint for progress.",
+                        "text": "Image generation started.",
                         "task_id": task_id,
                         "is_image": True
                     }
