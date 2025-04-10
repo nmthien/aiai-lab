@@ -6,6 +6,8 @@ from flask import Flask, request, jsonify, send_from_directory
 from flask_cors import CORS
 from openai import OpenAI
 from pymongo import MongoClient
+from image_keywords import IMAGE_GENERATION_KEYWORDS
+from agent_usernames import AGENT_USERNAMES
 
 app = Flask(__name__, static_folder='static')
 CORS(app)  # Enable CORS for all routes
@@ -150,7 +152,10 @@ class MidjourneyAgent:
             dict: Response containing the generated text/image and status
         """
         # Check if the prompt is requesting an image generation
-        if "generate an image" in prompt.lower() or "create an image" in prompt.lower() or "draw" in prompt.lower():
+        prompt_lower = prompt.lower()
+        is_image_request = any(keyword in prompt_lower for keyword in IMAGE_GENERATION_KEYWORDS)
+        
+        if is_image_request:
             # Extract the image description from the prompt
             # This is a simple approach - in a real app, you might use NLP to extract the description
             image_prompt = prompt
@@ -254,8 +259,7 @@ def get_agents():
     """Get list of available agents from MongoDB"""
     try:
         # Query for specific usernames
-        usernames = ["real3Pham", "thedarklady___", "Pokka_AIAI", "tHeyCallMeRah", "kenkaneki_ai"]
-        agents = list(agents_collection.find({"username": {"$in": usernames}}, {"_id": 0, "username": 1, "name": 1}))
+        agents = list(agents_collection.find({"username": {"$in": AGENT_USERNAMES}}, {"_id": 0, "username": 1, "name": 1}))
         return jsonify({"status": "success", "data": agents})
     except Exception as e:
         print(f"Error fetching agents: {str(e)}")
