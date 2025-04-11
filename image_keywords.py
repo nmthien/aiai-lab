@@ -4,8 +4,8 @@ These keywords are used to detect when a user wants to generate an image.
 """
 
 IMAGE_GENERATION_KEYWORDS = [
-    "generate an image",
-    "create an image",
+    "generate",
+    "create",
     "draw",
     "make a picture",
     "create a picture",
@@ -14,14 +14,14 @@ IMAGE_GENERATION_KEYWORDS = [
     "create art",
     "generate art",
     "make art",
-    "draw a picture",
     "illustrate",
     "visualize",
     "show me",
-    "picture of",
-    "image of",
-    "photo of",
+    "picture",
+    "image",
+    "photo",
     "photograph of",
+    "design",
+    "scene",
     "render",
-    "design"
 ] 
